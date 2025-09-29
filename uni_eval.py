@@ -64,6 +64,12 @@ DATASET_INFO = {
         "problem_key": "question",
         "answer_key": "answer",
         "category_keys": ["level"]
+    },
+    "stillarrow/MATH": {
+        "default_split": "train_lvl3to5",
+        "problem_key": "problem",
+        "answer_key": "expected_answer",
+        "category_keys": ["level", "type"]
     }
 }
 
@@ -426,6 +432,25 @@ def pass_at_k(correct_lst: list[bool], k: int) -> float:
             log_ratio += math.log(num_samples - num_correct - i) - math.log(num_samples - i)
         return 1.0 - math.exp(log_ratio)
 
+def mean_at_k(correct_lst: list[bool], k: int) -> float:
+    """
+    Computes mean@k: the average correctness of the top k samples.
+    This metric measures the expected number of correct solutions in the top k samples.
+    
+    Args:
+        correct_lst: List of boolean values indicating correctness of each sample
+        k: Number of top samples to consider
+        
+    Returns:
+        Average correctness rate within top k samples (between 0.0 and 1.0)
+    """
+    assert k > 0, "k must be greater than 0"
+    assert k <= len(correct_lst), "k must be less than or equal to the length of `correct_lst`"
+    
+    # Take the first k samples, don't need to sort by score
+    top_k_correct = correct_lst[:k]
+    return sum(top_k_correct) / k
+
 def bulid_choice_prompt(question: str, choices: list[str]):
     prompt = f"{question}\n\n\n"
     options = [chr(65 + i) for i in range(len(choices))]
@@ -454,7 +479,7 @@ def eval(
     fp16: bool = False,
     tensor_parallel_size: int = 8,
     enforce_eager: bool = False,
-    gpu_memory_utilization: float = 0.9,
+    gpu_memory_utilization: float = 0.8,
 
     # data
     data_dir: str = None, # If provided, the data will loaded from data_dir/data_id
@@ -531,7 +556,13 @@ def eval(
     test_dataset = test_dataset[split]
 
     if start_idx is not None and end_idx is not None:
-        test_dataset = test_dataset.select(range(start_idx, end_idx))
+        n = len(test_dataset)
+        si = max(0, start_idx)
+        ei = min(end_idx, n)
+        if si >= ei:
+            test_dataset = test_dataset.select([])
+        else:
+            test_dataset = test_dataset.select(range(si, ei))
 
     system_message = []
     if system_prompt_name != "disabled":
@@ -685,6 +716,7 @@ def eval(
 
         for k in ks:
             g[f"pass@{k}"] = pass_at_k(g["correct"], k)
+            g[f"mean@{k}"] = mean_at_k(g["correct"], k)
     write_jsonl(generation_file, generations)
 
     # dataset-level metrics
@@ -703,6 +735,21 @@ def eval(
             pass_prob_lst = [g[f"pass@{k}"] for g in generations]
             pass_prob_avg = sum(pass_prob_lst) / len(pass_prob_lst)
             f.write(f"Overall: {pass_prob_avg * 100:.1f}\n\n")
+
+        for k in ks:
+            f.write(f"mean@{k} >>>\n")
+            if "category_keys" in DATASET_INFO[data_id] and len(DATASET_INFO[data_id]["category_keys"]) > 0:
+                for ck in DATASET_INFO[data_id]["category_keys"]:
+                    all_cate = sorted(list(set([g[ck] for g in generations])))
+                    for cate in all_cate:
+                        mean_prob_lst = [g[f"mean@{k}"] for g in generations if g[ck] == cate]
+                        mean_prob_avg = sum(mean_prob_lst) / len(mean_prob_lst)
+                        f.write(f"{cate}: {mean_prob_avg * 100:.1f}\n")
+
+            # overall
+            mean_prob_lst = [g[f"mean@{k}"] for g in generations]
+            mean_prob_avg = sum(mean_prob_lst) / len(mean_prob_lst)
+            f.write(f"Overall: {mean_prob_avg * 100:.1f}\n\n")
 
     # print the result file
     with open(result_file, "r") as f:
