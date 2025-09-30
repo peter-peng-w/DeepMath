@@ -556,13 +556,17 @@ def eval(
     test_dataset = test_dataset[split]
 
     if start_idx is not None and end_idx is not None:
-        n = len(test_dataset)
+        dataset_size = len(test_dataset)
+        print(f"Total number of data: {dataset_size}")
         si = max(0, start_idx)
-        ei = min(end_idx, n)
+        ei = min(end_idx, dataset_size)
         if si >= ei:
+            print(f"start_idx({si}) is greater than end_idx({ei}), so no data will be selected")
             test_dataset = test_dataset.select([])
         else:
+            print(f"Selecting data from {si} to {ei}")
             test_dataset = test_dataset.select(range(si, ei))
+            print(f"Number of data selected: {len(test_dataset)}")
 
     system_message = []
     if system_prompt_name != "disabled":
@@ -604,6 +608,10 @@ def eval(
         for td in test_dataset
     ]
 
+    print(f"Formulated {len(prompts)} prompts")
+    print(f"First prompt: {prompts[0]}, length: {prompt_lens[0]}")
+    print(f"Last prompt: {prompts[-1]}, length: {prompt_lens[-1]}")
+
     # repeat n times
     sampling_params = [
         SamplingParams(
@@ -618,6 +626,8 @@ def eval(
     ]
     prompts = [p for p in prompts for i in range(n)]
     prompt_lens = [p for p in prompt_lens for i in range(n)]
+    
+    print(f"Generated {len(prompts)} duplicated prompts to sample {n} times for each question")
 
     # generate
     if os.path.exists(generation_file) and os.path.getsize(generation_file) > 0:

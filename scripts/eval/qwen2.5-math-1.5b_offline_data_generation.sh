@@ -15,8 +15,8 @@ SYSTEM_PROMPT_NAME="disabled"
 BF16="True"
 TENSOR_PARALLEL_SIZE="1"
 MAX_MODEL_LEN="3072"
-START_INDEX="8000"
-END_INDEX="9000"
+START_INDEX="7000"
+END_INDEX="8000"
 
 # VLLM environment variables
 export VLLM_ALLOW_LONG_MAX_MODEL_LEN=1
@@ -35,7 +35,7 @@ run_evaluation() {
     # Extract dataset name from data_id for output directory
     local dataset_name=$(echo "$data_id" | cut -d'/' -f2)
     local model_name="qwen2.5-math-1.5b"
-    local output_dir="./exp/${dataset_name}/${model_name}/${output_subdir}/index_${START_INDEX}_${END_INDEX}"
+    local output_dir="./exp/${dataset_name}/${model_name}/synthesize/lvl3to5_8k/${output_subdir}/index_${START_INDEX}_${END_INDEX}"
     
     echo "=========================================="
     echo "Running evaluation on: $data_id"
@@ -126,7 +126,7 @@ IFS=' ' read -r TEMPERATURE TOP_P N <<< "${CONFIGS[$CONFIG_TYPE]}"
 if [[ "$CONFIG_TYPE" == "greedy" ]]; then
     OUTPUT_SUBDIR="greedy"
 else
-    OUTPUT_SUBDIR="temperature_${TEMPERATURE}_top_p_${TOP_P}"
+    OUTPUT_SUBDIR="temperature_${TEMPERATURE}_top_p_${TOP_P}_rollouts_${N}"
 fi
 
 echo "Starting evaluations with configuration: $CONFIG_TYPE"
