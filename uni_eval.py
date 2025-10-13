@@ -654,8 +654,11 @@ def eval(
         write_jsonl(generation_file, generations)
 
     # compute correctness and pass@k (sample-level)
-    ks = [2 ** e for e in range(0, 7)]
-    ks = [k for k in ks if (2 * k) <= n or k == 1]
+    # For pass@k, we require that k is less than or equal to n/2 for statistical stability
+    # For mean@k, we don't have this restriction, so we can use any k that <= n
+    ks = [2 ** e for e in range(0, 10)]
+    ks_pass = [k for k in ks if (2 * k) <= n or k == 1]
+    ks_mean = [k for k in ks if k <= n or k == 1]
     for g in tqdm(generations, desc="computing correctness", total=len(generations)):
         gt_answer = g[answer_key]
         if isinstance(test_dataset.features[answer_key], ClassLabel):
@@ -724,14 +727,15 @@ def eval(
                 ) for resp in g["response"]
             ]
 
-        for k in ks:
+        for k in ks_pass:
             g[f"pass@{k}"] = pass_at_k(g["correct"], k)
+        for k in ks_mean:
             g[f"mean@{k}"] = mean_at_k(g["correct"], k)
     write_jsonl(generation_file, generations)
 
     # dataset-level metrics
     with open(result_file, "w") as f:
-        for k in ks:
+        for k in ks_pass:
             f.write(f"pass@{k} >>>\n")
             if "category_keys" in DATASET_INFO[data_id] and len(DATASET_INFO[data_id]["category_keys"]) > 0:
                 for ck in DATASET_INFO[data_id]["category_keys"]:
@@ -739,14 +743,14 @@ def eval(
                     for cate in all_cate:
                         pass_prob_lst = [g[f"pass@{k}"] for g in generations if g[ck] == cate]
                         pass_prob_avg = sum(pass_prob_lst) / len(pass_prob_lst)
-                        f.write(f"{cate}: {pass_prob_avg * 100:.1f}\n")
+                        f.write(f"{cate}: {pass_prob_avg * 100:.1f} ({len(pass_prob_lst)} samples)\n")
 
             # overall
             pass_prob_lst = [g[f"pass@{k}"] for g in generations]
             pass_prob_avg = sum(pass_prob_lst) / len(pass_prob_lst)
-            f.write(f"Overall: {pass_prob_avg * 100:.1f}\n\n")
+            f.write(f"Overall: {pass_prob_avg * 100:.1f} ({len(pass_prob_lst)} samples)\n\n")
 
-        for k in ks:
+        for k in ks_mean:
             f.write(f"mean@{k} >>>\n")
             if "category_keys" in DATASET_INFO[data_id] and len(DATASET_INFO[data_id]["category_keys"]) > 0:
                 for ck in DATASET_INFO[data_id]["category_keys"]:
@@ -754,12 +758,12 @@ def eval(
                     for cate in all_cate:
                         mean_prob_lst = [g[f"mean@{k}"] for g in generations if g[ck] == cate]
                         mean_prob_avg = sum(mean_prob_lst) / len(mean_prob_lst)
-                        f.write(f"{cate}: {mean_prob_avg * 100:.1f}\n")
+                        f.write(f"{cate}: {mean_prob_avg * 100:.1f} ({len(mean_prob_lst)} samples)\n")
 
             # overall
             mean_prob_lst = [g[f"mean@{k}"] for g in generations]
             mean_prob_avg = sum(mean_prob_lst) / len(mean_prob_lst)
-            f.write(f"Overall: {mean_prob_avg * 100:.1f}\n\n")
+            f.write(f"Overall: {mean_prob_avg * 100:.1f} ({len(mean_prob_lst)} samples)\n\n")
 
     # print the result file
     with open(result_file, "r") as f:
