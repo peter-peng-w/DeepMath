@@ -1,49 +1,27 @@
 #!/bin/bash
 set -e
 set -u
+
 export CUDA_VISIBLE_DEVICES=0
+
 # =============================================================================
 # Composable Evaluation Script for Qwen2.5-Math-1.5B
 # =============================================================================
 
 # Model configuration (shared across all evaluations)
-
-# 1. This is actually using the DAPO loss, but both the low and high epsilon are set to 0.2
-# BASE_MODEL="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/grpo/lvl3to5_8k_20epochs_128effectbs/checkpoint-160"
-# BASE_MODEL="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/grpo/lvl3to5_8k_20epochs_128effectbs/checkpoint-320"
-# BASE_MODEL="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/grpo/lvl3to5_8k_20epochs_128effectbs/checkpoint-480"
-# BASE_MODEL="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/grpo/lvl3to5_8k_20epochs_128effectbs/checkpoint-640"
-# BASE_MODEL="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/grpo/lvl3to5_8k_20epochs_128effectbs/checkpoint-800"
-# BASE_MODEL="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/grpo/lvl3to5_8k_20epochs_128effectbs/checkpoint-960"
-# BASE_MODEL="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/grpo/lvl3to5_8k_20epochs_128effectbs/checkpoint-1120"
-# BASE_MODEL="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/grpo/lvl3to5_8k_20epochs_128effectbs/checkpoint-1280"
-# BASE_MODEL="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/grpo/lvl3to5_8k_20epochs_128effectbs/checkpoint-1440"
-# BASE_MODEL="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/grpo/lvl3to5_8k_20epochs_128effectbs/checkpoint-1600"
-# BASE_MODEL="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/grpo/lvl3to5_8k_20epochs_128effectbs/checkpoint-1760"
-# BASE_MODEL="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/grpo/lvl3to5_8k_20epochs_128effectbs/checkpoint-1920"
-# BASE_MODEL="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/grpo/lvl3to5_8k_20epochs_128effectbs/checkpoint-2080"
-# BASE_MODEL="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/grpo/lvl3to5_8k_20epochs_128effectbs/checkpoint-2240"
-# BASE_MODEL="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/grpo/lvl3to5_8k_20epochs_128effectbs/checkpoint-2400"
-# BASE_MODEL="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/grpo/lvl3to5_8k_20epochs_128effectbs/checkpoint-2560"
-# BASE_MODEL="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/grpo/lvl3to5_8k_20epochs_128effectbs/checkpoint-2720"
-# BASE_MODEL="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/grpo/lvl3to5_8k_20epochs_128effectbs/checkpoint-2880"
-# BASE_MODEL="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/grpo/lvl3to5_8k_20epochs_128effectbs/checkpoint-3040"
-# BASE_MODEL="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/grpo/lvl3to5_8k_20epochs_128effectbs/checkpoint-3200"
-# BASE_MODEL="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/grpo/lvl3to5_8k_20epochs_128effectbs/checkpoint-3360"
-# BASE_MODEL="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/grpo/lvl3to5_8k_20epochs_128effectbs/checkpoint-3520"
-# BASE_MODEL="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/grpo/lvl3to5_8k_20epochs_128effectbs/checkpoint-3680"
-# BASE_MODEL="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/grpo/lvl3to5_8k_20epochs_128effectbs/checkpoint-3840"
-BASE_MODEL="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/grpo/lvl3to5_8k_20epochs_128effectbs/checkpoint-4000"
-# BASE_MODEL="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/grpo/lvl3to5_8k_20epochs_128effectbs/checkpoint-6560"
+# BASE_MODEL="Qwen/Qwen2.5-Math-1.5B"
+BASE_MODEL="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/grpo/lvl3to5_8k_20epochs_128effectbs/checkpoint-6560"
 CHAT_TEMPLATE_NAME="default"
 SYSTEM_PROMPT_NAME="disabled"
 BF16="True"
 TENSOR_PARALLEL_SIZE="1"
 MAX_MODEL_LEN="3072"
+START_INDEX="8000"
+END_INDEX="8523"
 
 # VLLM environment variables
 export VLLM_ALLOW_LONG_MAX_MODEL_LEN=1
-export VLLM_ATTENTION_BACKEND=XFORMERS
+# export VLLM_FLASHINFER_SAMPLER=0
 export VLLM_WORKER_MULTIPROC_METHOD=spawn
 
 # Function to run evaluation
@@ -57,8 +35,9 @@ run_evaluation() {
     
     # Extract dataset name from data_id for output directory
     local dataset_name=$(echo "$data_id" | cut -d'/' -f2)
-    local model_name="qwen2.5-math-1.5b/math500/grpo/lvl3to5_8k_20epochs_128effectbs/checkpoint-4000"
-    local output_dir="./exp/${dataset_name}/${model_name}/${output_subdir}"
+    # local model_name="qwen2.5-math-1.5b"
+    local model_name="qwen2.5-math-1.5b/math500/dapo/lvl3to5_8k_20epochs_128effectbs/checkpoint-6560"
+    local output_dir="./exp/${dataset_name}/${model_name}/synthesize/lvl3to5_8k/${output_subdir}/index_${START_INDEX}_${END_INDEX}"
     
     echo "=========================================="
     echo "Running evaluation on: $data_id"
@@ -78,7 +57,9 @@ run_evaluation() {
         --max_model_len "$MAX_MODEL_LEN" \
         --temperature "$temperature" \
         --top_p "$top_p" \
-        --n "$n"
+        --n "$n" \
+        --start_idx "$START_INDEX" \
+        --end_idx "$END_INDEX"
     
     echo "Completed evaluation on: $data_id"
     echo ""
@@ -90,21 +71,28 @@ run_evaluation() {
 
 # Define datasets to evaluate with their corresponding splits
 # Format: "data_id|split"
+
+#### Evaluation Datasets ####
+# DATASETS=(
+#     "zwhe99/MATH|math500"                     # MATH500
+#     "zwhe99/amc23|test"                       # AMC23
+#     "zwhe99/simplerl-OlympiadBench|test"      # OlympiadBench
+#     "zwhe99/simplerl-minerva-math|test"       # MinervaMath
+#     "zwhe99/aime90|2024"                      # AIME24
+#     "math-ai/aime25|test"                     # AIME25
+#     # Add more datasets here as needed
+# )
+#### Training Datasets ####
 DATASETS=(
-    # "zwhe99/MATH|math500"                     # MATH500
-    "zwhe99/amc23|test"                       # AMC23
-    # "zwhe99/simplerl-OlympiadBench|test"      # OlympiadBench
-    # "zwhe99/simplerl-minerva-math|test"       # MinervaMath
-    "zwhe99/aime90|2024"                      # AIME24
-    "math-ai/aime25|test"                     # AIME25
+    "stillarrow/MATH|train_lvl3to5"                     # train_lvl3to5
     # Add more datasets here as needed
 )
 
 # Define evaluation configurations
 declare -A CONFIGS
 # Sampling: Use multiple samples (n=16) for pass@k metrics with k>1
-# CONFIGS["sampling"]="0.6 0.95 16"    # temperature top_p n
-CONFIGS["sampling"]="0.6 0.95 64"    # temperature top_p n
+# CONFIGS["sampling"]="1.0 1.0 128"    # temperature top_p n
+CONFIGS["sampling"]="0.6 0.95 16"    # temperature top_p n
 # Greedy: Use single sample (n=1) since greedy decoding is deterministic
 # Using n>1 for greedy would be wasteful as all samples would be identical
 CONFIGS["greedy"]="0.0 1.0 1"        # temperature top_p n

@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 set -u
+export CUDA_VISIBLE_DEVICES=1
 
 # =============================================================================
 # Composable Evaluation Script for Qwen2.5-Math-1.5B
@@ -11,7 +12,7 @@ BASE_MODEL="Qwen/Qwen2.5-Math-1.5B"
 CHAT_TEMPLATE_NAME="default"
 SYSTEM_PROMPT_NAME="disabled"
 BF16="True"
-TENSOR_PARALLEL_SIZE="4"
+TENSOR_PARALLEL_SIZE="1"
 MAX_MODEL_LEN="3072"
 
 # VLLM environment variables
@@ -30,7 +31,7 @@ run_evaluation() {
     
     # Extract dataset name from data_id for output directory
     local dataset_name=$(echo "$data_id" | cut -d'/' -f2)
-    local model_name="qwen2.5-math-1.5b"
+    local model_name="qwen2.5-math-1.5b/base"
     local output_dir="./exp/${dataset_name}/${model_name}/${output_subdir}"
     
     echo "=========================================="
@@ -66,10 +67,10 @@ run_evaluation() {
 
 #### Evaluation Datasets ####
 DATASETS=(
-    "zwhe99/MATH|math500"                     # MATH500
+    # "zwhe99/MATH|math500"                     # MATH500
     "zwhe99/amc23|test"                       # AMC23
-    "zwhe99/simplerl-OlympiadBench|test"      # OlympiadBench
-    "zwhe99/simplerl-minerva-math|test"       # MinervaMath
+    # "zwhe99/simplerl-OlympiadBench|test"      # OlympiadBench
+    # "zwhe99/simplerl-minerva-math|test"       # MinervaMath
     "zwhe99/aime90|2024"                      # AIME24
     "math-ai/aime25|test"                     # AIME25
     # Add more datasets here as needed
@@ -83,7 +84,8 @@ DATASETS=(
 # Define evaluation configurations
 declare -A CONFIGS
 # Sampling: Use multiple samples (n=16) for pass@k metrics with k>1
-CONFIGS["sampling"]="0.6 0.95 16"    # temperature top_p n
+# CONFIGS["sampling"]="0.6 0.95 16"    # temperature top_p n
+CONFIGS["sampling"]="0.6 0.95 64"    # temperature top_p n
 # Greedy: Use single sample (n=1) since greedy decoding is deterministic
 # Using n>1 for greedy would be wasteful as all samples would be identical
 CONFIGS["greedy"]="0.0 1.0 1"        # temperature top_p n
@@ -119,7 +121,7 @@ IFS=' ' read -r TEMPERATURE TOP_P N <<< "${CONFIGS[$CONFIG_TYPE]}"
 if [[ "$CONFIG_TYPE" == "greedy" ]]; then
     OUTPUT_SUBDIR="greedy"
 else
-    OUTPUT_SUBDIR="temperature_${TEMPERATURE}_top_p_${TOP_P}"
+    OUTPUT_SUBDIR="temperature_${TEMPERATURE}_top_p_${TOP_P}_rollouts_${N}"
 fi
 
 echo "Starting evaluations with configuration: $CONFIG_TYPE"

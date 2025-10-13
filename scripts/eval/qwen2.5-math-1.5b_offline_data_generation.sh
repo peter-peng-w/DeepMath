@@ -2,7 +2,7 @@
 set -e
 set -u
 
-export CUDA_VISIBLE_DEVICES=1
+export CUDA_VISIBLE_DEVICES=0
 
 # =============================================================================
 # Composable Evaluation Script for Qwen2.5-Math-1.5B
@@ -15,8 +15,8 @@ SYSTEM_PROMPT_NAME="disabled"
 BF16="True"
 TENSOR_PARALLEL_SIZE="1"
 MAX_MODEL_LEN="3072"
-START_INDEX="7000"
-END_INDEX="8000"
+START_INDEX="8000"
+END_INDEX="8523"
 
 # VLLM environment variables
 export VLLM_ALLOW_LONG_MAX_MODEL_LEN=1
