@@ -488,9 +488,15 @@ def eval(
     subset: str = None,
     start_idx: int = None,
     end_idx: int = None,
+    # Local JSON/JSONL file support
+    local_data_path: str = None, # Direct path to a local JSON/JSONL file
+    problem_key_override: str = None, # Override the problem key from DATASET_INFO
+    answer_key_override: str = None, # Override the answer key from DATASET_INFO
+    category_keys_override: list = None, # Override the category keys from DATASET_INFO
 
     # gen
     max_model_len: int = 32768,
+    max_new_tokens: int = None,  # If None, defaults to max_model_len
     temperature: float = 0.6,
     top_p: float = 1.0,
     top_k: int = -1,
@@ -515,12 +521,37 @@ def eval(
         split = str(split)
 
     # save config
-    write_json(config_file, locals())
+    # Handle list conversion for category_keys_override before saving
+    config_to_save = {k: v for k, v in locals().items() if k != 'config_to_save'}
+    write_json(config_file, config_to_save)
 
-    # Get dataset info
-    problem_key = DATASET_INFO[data_id]["problem_key"]
-    answer_key = DATASET_INFO[data_id]["answer_key"]
-    choice_key = DATASET_INFO[data_id]["choice_key"] if "choice_key" in DATASET_INFO[data_id] else None
+    # Determine data loading mode and get dataset info
+    use_local_data = local_data_path is not None
+    
+    if use_local_data:
+        # Local JSON/JSONL file mode
+        assert problem_key_override is not None, "problem_key_override is required when using local_data_path"
+        assert answer_key_override is not None, "answer_key_override is required when using local_data_path"
+        
+        problem_key = problem_key_override
+        answer_key = answer_key_override
+        choice_key = None  # Local files don't support choice questions yet
+        category_keys = category_keys_override if category_keys_override else []
+        
+        print(f"Loading local data from: {local_data_path}")
+        print(f"  problem_key: {problem_key}")
+        print(f"  answer_key: {answer_key}")
+        if category_keys:
+            print(f"  category_keys: {category_keys}")
+    else:
+        # HuggingFace dataset mode
+        assert data_id is not None, "data_id is required when not using local_data_path"
+        assert data_id in DATASET_INFO, f"data_id '{data_id}' not found in DATASET_INFO"
+        
+        problem_key = problem_key_override if problem_key_override else DATASET_INFO[data_id]["problem_key"]
+        answer_key = answer_key_override if answer_key_override else DATASET_INFO[data_id]["answer_key"]
+        choice_key = DATASET_INFO[data_id]["choice_key"] if "choice_key" in DATASET_INFO[data_id] else None
+        category_keys = category_keys_override if category_keys_override else DATASET_INFO[data_id].get("category_keys", [])
 
     # load model
     llm = LLM(
@@ -530,30 +561,57 @@ def eval(
         seed=seed,
         gpu_memory_utilization=gpu_memory_utilization,
         enforce_eager=enforce_eager,
+        max_model_len=max_model_len,
     )
     tokenizer = AutoTokenizer.from_pretrained(base_model)
     if chat_template_name is not None and chat_template_name != "default":
         tokenizer.chat_template = CHAT_TEMPLATE[chat_template_name]
 
     # Load data
-    if subset is None and "default_subset" in DATASET_INFO[data_id]:
-        subset = DATASET_INFO[data_id]["default_subset"]
-
-    if data_dir is None:
-        if subset is None:
-            test_dataset = load_dataset(data_id)
+    if use_local_data:
+        # Load from local JSON/JSONL file
+        if not os.path.exists(local_data_path):
+            raise FileNotFoundError(f"Local data file not found: {local_data_path}")
+        
+        # Detect file type by extension
+        if local_data_path.endswith('.jsonl'):
+            test_dataset = load_dataset('json', data_files=local_data_path, split='train')
+        elif local_data_path.endswith('.json'):
+            # For JSON files, we need to check if it's a JSON Lines file or a regular JSON array
+            import json
+            with open(local_data_path, 'r') as f:
+                first_char = f.read(1)
+                f.seek(0)
+                if first_char == '[':
+                    # Regular JSON array
+                    test_dataset = load_dataset('json', data_files=local_data_path, split='train')
+                else:
+                    # JSON Lines format (multiple JSON objects, one per line)
+                    test_dataset = load_dataset('json', data_files=local_data_path, split='train')
         else:
-            test_dataset = load_dataset(data_id, subset)
+            raise ValueError(f"Unsupported file format: {local_data_path}. Use .json or .jsonl files.")
+        
+        print(f"Loaded {len(test_dataset)} samples from local file")
     else:
-        if subset is None:
-            test_dataset = load_from_disk(os.path.join(data_dir, data_id))
+        # Load from HuggingFace dataset
+        if subset is None and "default_subset" in DATASET_INFO[data_id]:
+            subset = DATASET_INFO[data_id]["default_subset"]
+
+        if data_dir is None:
+            if subset is None:
+                test_dataset = load_dataset(data_id)
+            else:
+                test_dataset = load_dataset(data_id, subset)
         else:
-            test_dataset = load_from_disk(os.path.join(data_dir, data_id, subset))
+            if subset is None:
+                test_dataset = load_from_disk(os.path.join(data_dir, data_id))
+            else:
+                test_dataset = load_from_disk(os.path.join(data_dir, data_id, subset))
 
-    if split is None:
-        split = DATASET_INFO[data_id]["default_split"]
+        if split is None:
+            split = DATASET_INFO[data_id]["default_split"]
 
-    test_dataset = test_dataset[split]
+        test_dataset = test_dataset[split]
 
     if start_idx is not None and end_idx is not None:
         dataset_size = len(test_dataset)
@@ -612,6 +670,11 @@ def eval(
     print(f"First prompt: {prompts[0]}, length: {prompt_lens[0]}")
     print(f"Last prompt: {prompts[-1]}, length: {prompt_lens[-1]}")
 
+    # Set max_new_tokens (default to max_model_len if not specified for backward compatibility)
+    effective_max_new_tokens = max_new_tokens if max_new_tokens is not None else max_model_len
+    print(f"Max model length (context window): {max_model_len}")
+    print(f"Max new tokens (generation limit): {effective_max_new_tokens}")
+
     # repeat n times
     sampling_params = [
         SamplingParams(
@@ -619,7 +682,7 @@ def eval(
             top_p=top_p,
             top_k=top_k,
             repetition_penalty=repetition_penalty,
-            max_tokens=max_model_len,
+            max_tokens=effective_max_new_tokens,
             n=1,
             seed=seed + i,
         ) for p, pl in zip(prompts, prompt_lens) for i in range(n)
@@ -737,8 +800,8 @@ def eval(
     with open(result_file, "w") as f:
         for k in ks_pass:
             f.write(f"pass@{k} >>>\n")
-            if "category_keys" in DATASET_INFO[data_id] and len(DATASET_INFO[data_id]["category_keys"]) > 0:
-                for ck in DATASET_INFO[data_id]["category_keys"]:
+            if category_keys and len(category_keys) > 0:
+                for ck in category_keys:
                     all_cate = sorted(list(set([g[ck] for g in generations])))
                     for cate in all_cate:
                         pass_prob_lst = [g[f"pass@{k}"] for g in generations if g[ck] == cate]
@@ -752,8 +815,8 @@ def eval(
 
         for k in ks_mean:
             f.write(f"mean@{k} >>>\n")
-            if "category_keys" in DATASET_INFO[data_id] and len(DATASET_INFO[data_id]["category_keys"]) > 0:
-                for ck in DATASET_INFO[data_id]["category_keys"]:
+            if category_keys and len(category_keys) > 0:
+                for ck in category_keys:
                     all_cate = sorted(list(set([g[ck] for g in generations])))
                     for cate in all_cate:
                         mean_prob_lst = [g[f"mean@{k}"] for g in generations if g[ck] == cate]

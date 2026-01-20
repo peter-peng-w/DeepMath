@@ -12,7 +12,8 @@ export DEFAULT_CHAT_TEMPLATE_NAME="default"
 export DEFAULT_SYSTEM_PROMPT_NAME="disabled"
 export DEFAULT_BF16="True"
 export DEFAULT_TENSOR_PARALLEL_SIZE="1"
-export DEFAULT_MAX_MODEL_LEN="3072"
+export DEFAULT_MAX_MODEL_LEN="4096"             # Qwen2.5-Math: 4096, Qwen3: 16384
+export DEFAULT_MAX_NEW_TOKENS="3072"
 
 # VLLM environment variables
 export VLLM_ALLOW_LONG_MAX_MODEL_LEN=1
@@ -37,6 +38,7 @@ DATASETS=(
 # as we don't have enough samples in these test benchmarks.
 # For easier datasets such as MATH500 and minerva, we can use less rollouts per question (e.g., 16) as they have enough testing samples.
 declare -A CONFIGS
+# CONFIGS["sampling"]="0.6 0.95 4"    # temperature top_p n
 # CONFIGS["sampling"]="0.6 0.95 16"    # temperature top_p n
 CONFIGS["sampling"]="0.6 0.95 64"    # temperature top_p n
 CONFIGS["greedy"]="0.0 1.0 1"        # temperature top_p n
@@ -99,6 +101,20 @@ CHECKPOINT LIST FORMAT:
     /path/to/checkpoint-2000
     /path/to/checkpoint-3000
     # Lines starting with # are ignored
+
+HUGGINGFACE MODELS:
+    You can also evaluate HuggingFace models directly by specifying their model IDs:
+    
+    # Single HF model via command line
+    $0 --checkpoints "Qwen/Qwen2.5-Math-1.5B" --config greedy
+    
+    # Multiple HF models via command line
+    $0 --checkpoints "Qwen/Qwen2.5-Math-1.5B,deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
+    
+    # HF models via file (hf_models.txt):
+    Qwen/Qwen2.5-Math-1.5B
+    Qwen/Qwen2.5-Math-7B
+    deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B
 
 EOF
 }
@@ -192,6 +208,69 @@ get_checkpoint_name() {
     basename "$checkpoint_path"
 }
 
+acquire_gpu() {
+    local gpu_pool_dir="$1"
+    local timeout=3600  # 1 hour timeout
+    local wait_time=0
+    local sleep_interval=5
+    
+    # Parse GPU_IDS_STR into array (bash arrays can't be exported to subshells)
+    IFS=',' read -ra AVAILABLE_GPUS <<< "$GPU_IDS_STR"
+    
+    while true; do
+        # Try to acquire a GPU lock
+        for gpu_id in "${AVAILABLE_GPUS[@]}"; do
+            local lock_file="${gpu_pool_dir}/gpu_${gpu_id}.lock"
+            local lock_dir="${gpu_pool_dir}/gpu_${gpu_id}.lock.d"
+            
+            # Check for stale locks (process no longer exists)
+            if [[ -f "$lock_file" ]] && [[ -d "$lock_dir" ]]; then
+                local lock_pid=$(cat "$lock_file" 2>/dev/null)
+                if [[ -n "$lock_pid" ]] && ! kill -0 "$lock_pid" 2>/dev/null; then
+                    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Cleaning up stale lock for GPU $gpu_id (PID $lock_pid)" >&2
+                    rm -f "$lock_file"
+                    rmdir "$lock_dir" 2>/dev/null
+                fi
+            fi
+            
+            # Try to create lock file atomically (using mkdir for atomicity)
+            if mkdir "$lock_dir" 2>/dev/null; then
+                # Successfully acquired lock
+                echo $$ > "$lock_file"
+                echo "[$(date '+%Y-%m-%d %H:%M:%S')] PID $$ acquired GPU $gpu_id" >&2
+                echo "$gpu_id"
+                return 0
+            fi
+        done
+        
+        # No GPU available, wait and retry
+        if [[ $wait_time -eq 0 ]]; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] PID $$ waiting for available GPU (pool: $GPU_IDS_STR)..." >&2
+        fi
+        sleep $sleep_interval
+        wait_time=$((wait_time + sleep_interval))
+        
+        if [[ $wait_time -ge $timeout ]]; then
+            echo "[$(date '+%Y-%m-%d %H:%M:%S')] Error: PID $$ timeout waiting for GPU after ${timeout}s" >&2
+            return 1
+        fi
+    done
+}
+
+release_gpu() {
+    local gpu_pool_dir="$1"
+    local gpu_id="$2"
+    
+    local lock_file="${gpu_pool_dir}/gpu_${gpu_id}.lock"
+    local lock_dir="${gpu_pool_dir}/gpu_${gpu_id}.lock.d"
+    
+    # Remove lock
+    rm -f "$lock_file"
+    rmdir "$lock_dir" 2>/dev/null
+    
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] PID $$ released GPU $gpu_id" >&2
+}
+
 run_single_evaluation() {
     local checkpoint_path="$1"
     local data_id="$2"
@@ -201,7 +280,20 @@ run_single_evaluation() {
     local top_p="$6"
     local n="$7"
     local output_base="$8"
-    local gpu_id="$9"
+    local gpu_pool_dir="$9"
+    
+    # Dynamically acquire an available GPU
+    local gpu_id
+    gpu_id=$(acquire_gpu "$gpu_pool_dir")
+    local acquire_status=$?
+    
+    if [[ $acquire_status -ne 0 ]]; then
+        echo "Failed to acquire GPU, skipping job: $checkpoint_path - $data_id"
+        return 1
+    fi
+    
+    # Ensure GPU is released on exit (success or failure)
+    trap "release_gpu '$gpu_pool_dir' '$gpu_id'" EXIT INT TERM
     
     # Create meaningful names
     local checkpoint_name=$(get_checkpoint_name "$checkpoint_path")
@@ -223,10 +315,11 @@ run_single_evaluation() {
     echo "Dataset: $data_id"
     echo "Config: $config_type (temp=$temperature, top_p=$top_p, n=$n)"
     echo "Output: $output_dir"
-    echo "GPU: $gpu_id"
+    echo "GPU: $gpu_id (PID: $$)"
     echo "=========================================="
     
-    # Run evaluation
+    # Run evaluation with error handling
+    local exit_code=0
     CUDA_VISIBLE_DEVICES=$gpu_id python3 uni_eval.py \
         --base_model "$checkpoint_path" \
         --chat_template_name "$DEFAULT_CHAT_TEMPLATE_NAME" \
@@ -237,12 +330,20 @@ run_single_evaluation() {
         --data_id "$data_id" \
         --split "$split" \
         --max_model_len "$DEFAULT_MAX_MODEL_LEN" \
+        --max_new_tokens "$DEFAULT_MAX_NEW_TOKENS" \
         --temperature "$temperature" \
         --top_p "$top_p" \
-        --n "$n"
+        --n "$n" || exit_code=$?
     
-    echo "Completed: $checkpoint_name on $dataset_name ($config_type)"
+    if [[ $exit_code -eq 0 ]]; then
+        echo "✓ Completed: $checkpoint_name on $dataset_name ($config_type) [GPU $gpu_id]"
+    else
+        echo "✗ Failed: $checkpoint_name on $dataset_name ($config_type) [GPU $gpu_id] (exit code: $exit_code)"
+    fi
     echo ""
+    
+    # GPU will be released by the trap
+    return $exit_code
 }
 
 check_existing_results() {
@@ -422,6 +523,7 @@ fi
 # Set up GPUs for parallel execution
 IFS=',' read -ra GPU_IDS <<< "$GPUS"
 NUM_GPUS=${#GPU_IDS[@]}
+GPU_IDS_STR="$GPUS"  # Keep original string format for export (arrays can't be exported)
 echo "Using $NUM_GPUS GPUs for parallel evaluation: ${GPU_IDS[*]}"
 echo ""
 
@@ -435,15 +537,39 @@ echo ""
 # Create output directory
 mkdir -p "$OUTPUT_BASE"
 
-# Export the function to be used by xargs
-export -f run_single_evaluation get_checkpoint_name
+# Create GPU pool directory for lock management
+GPU_POOL_DIR=$(mktemp -d "${OUTPUT_BASE}/.gpu_pool.XXXXXX")
+echo "GPU pool directory: $GPU_POOL_DIR"
+
+# Cleanup function to remove GPU pool on exit
+cleanup_gpu_pool() {
+    echo "Cleaning up GPU pool..."
+    rm -rf "$GPU_POOL_DIR"
+}
+trap cleanup_gpu_pool EXIT INT TERM
+
+# Export functions and variables to be used by xargs
+export -f run_single_evaluation get_checkpoint_name acquire_gpu release_gpu
+export GPU_IDS_STR  # Export as string (bash arrays can't be exported to subshells)
+export GPU_POOL_DIR
 
 # Create a list of all jobs to run
 declare -a JOBS
 for checkpoint_path in "${CHECKPOINT_LIST[@]}"; do
-    if [[ ! -d "$checkpoint_path" ]] && [[ ! -f "$checkpoint_path/config.json" ]] && [[ ! -f "$checkpoint_path/model.safetensors" ]]; then
-        echo "Warning: Checkpoint not found or invalid: $checkpoint_path"
-        continue
+    # Check if it's a HuggingFace model identifier (format: org/model or user/model)
+    # HF model IDs contain a "/" but don't start with "/" (not absolute paths)
+    is_hf_model=false
+    if [[ "$checkpoint_path" =~ ^[^/]+/[^/]+$ ]] && [[ ! "$checkpoint_path" =~ ^/ ]]; then
+        is_hf_model=true
+        echo "Detected HuggingFace model: $checkpoint_path"
+    fi
+    
+    # Skip local validation for HuggingFace models
+    if [[ "$is_hf_model" == false ]]; then
+        if [[ ! -d "$checkpoint_path" ]] && [[ ! -f "$checkpoint_path/config.json" ]] && [[ ! -f "$checkpoint_path/model.safetensors" ]]; then
+            echo "Warning: Checkpoint not found or invalid: $checkpoint_path"
+            continue
+        fi
     fi
     
     for dataset_entry in "${DATASETS[@]}"; do
@@ -467,15 +593,13 @@ done
 # Main evaluation loop - execute jobs in parallel
 total_jobs=${#JOBS[@]}
 echo "Total evaluation jobs to run: $total_jobs"
+echo "Jobs will dynamically acquire GPUs from pool: ${GPU_IDS[*]}"
+echo ""
 
-# Distribute jobs to GPUs
-job_idx=0
+# Execute jobs with dynamic GPU allocation
+# Each job will acquire an available GPU when it starts and release it when done
 for job in "${JOBS[@]}"; do
-    gpu_idx=$((job_idx % NUM_GPUS))
-    gpu_id=${GPU_IDS[$gpu_idx]}
-    
-    echo "$job $OUTPUT_BASE $gpu_id"
-    job_idx=$((job_idx + 1))
+    echo "$job $OUTPUT_BASE $GPU_POOL_DIR"
 done | xargs -n 9 -P "$NUM_GPUS" bash -c 'run_single_evaluation "$@"' _
 
 echo "=========================================="
