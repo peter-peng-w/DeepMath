@@ -26,16 +26,17 @@ Choices are shuffled with a deterministic seed to prevent position bias.
 
 ```
 DeepMath/
-├── mcqa_eval.py                          # Main evaluation script (vLLM-based)
+├── mcqa_eval.py                                    # Single-model MCQA evaluation (vLLM-based)
 ├── scripts/
-│   ├── prepare_gpqa_diamond.py           # Download & format GPQA Diamond
+│   ├── prepare_gpqa_diamond.py                     # Download & format GPQA Diamond
 │   └── eval/
-│       └── mcqa_eval.sh                  # Wrapper script for MCQA evaluation
+│       ├── mcqa_eval.sh                            # Single-model wrapper
+│       └── multi_checkpoint_mcqa_eval.sh           # Multi-checkpoint batch evaluation
 └── data/
     ├── science_qa/
-    │   └── test.json                     # Science QA test split (1,672 examples)
+    │   └── test.json                               # Science QA test split (1,672 examples)
     └── gpqa_diamond/
-        └── test.json                     # GPQA Diamond (198 examples)
+        └── test.json                               # GPQA Diamond (198 examples)
 ```
 
 ## Quick Start
@@ -49,7 +50,7 @@ GPQA Diamond needs to be downloaded and formatted:
 python scripts/prepare_gpqa_diamond.py
 ```
 
-### 2. Evaluate a model
+### 2. Evaluate a single model
 
 ```bash
 # Science QA only
@@ -62,20 +63,68 @@ bash scripts/eval/mcqa_eval.sh --model Qwen/Qwen3-0.6B --dataset gpqa_diamond --
 bash scripts/eval/mcqa_eval.sh --model Qwen/Qwen3-0.6B --dataset all --gpu 0
 ```
 
-### 3. Evaluate a training checkpoint
+### 3. Evaluate multiple checkpoints (batch)
+
+The `multi_checkpoint_mcqa_eval.sh` script automatically discovers checkpoints in a training directory, evaluates them in parallel across GPUs, and prints a summary.
 
 ```bash
-bash scripts/eval/mcqa_eval.sh \
-    --model /path/to/checkpoint \
-    --dataset all \
-    --gpu 0 \
-    --n 8 \
-    --temperature 0.6
+# Evaluate all checkpoints in a training run
+bash scripts/eval/multi_checkpoint_mcqa_eval.sh \
+    --checkpoints exp/qwen3-0.6b/science_qa/grpo/repeat_sampler_grpo_8rollouts/ \
+    --gpus "0,1,2,3" --dataset all
+
+# Latest 5 checkpoints only
+bash scripts/eval/multi_checkpoint_mcqa_eval.sh \
+    --checkpoints exp/qwen3-0.6b/science_qa/grpo/repeat_sampler_grpo_8rollouts/ \
+    --gpus "0,1,2,3" --latest 5
+
+# Skip already-evaluated checkpoints (useful for resuming)
+bash scripts/eval/multi_checkpoint_mcqa_eval.sh \
+    --checkpoints exp/qwen3-0.6b/science_qa/grpo/repeat_sampler_grpo_8rollouts/ \
+    --gpus "0,1,2,3" --skip-existing
+
+# Evaluate HuggingFace models
+bash scripts/eval/multi_checkpoint_mcqa_eval.sh \
+    --checkpoints "Qwen/Qwen3-0.6B,Qwen/Qwen3-1.7B" \
+    --gpus "0,1" --dataset all
+
+# Evaluate checkpoints listed in a file
+bash scripts/eval/multi_checkpoint_mcqa_eval.sh \
+    --checkpoints checkpoints.txt --gpus "0,1,2,3"
+
+# With thinking enabled
+bash scripts/eval/multi_checkpoint_mcqa_eval.sh \
+    --checkpoints exp/qwen3-0.6b/... --gpus "0,1,2,3" --enable-thinking
 ```
+
+The `--checkpoints` argument accepts three formats:
+- **Directory**: auto-discovers subdirectories matching `--pattern` (default `checkpoint-*`) that contain `config.json` or `model.safetensors`
+- **Text file**: one checkpoint path per line (lines starting with `#` are ignored)
+- **Comma-separated list**: inline paths or HuggingFace model IDs
 
 ## Options
 
-### mcqa_eval.sh
+### multi_checkpoint_mcqa_eval.sh
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--checkpoints` | (required) | Directory, file, or comma-separated checkpoint paths |
+| `--dataset` | `all` | `science_qa`, `gpqa_diamond`, or `all` |
+| `--gpus` | `0` | Comma-separated GPU IDs for parallel execution |
+| `--config` | `sampling` | `sampling` (temp=0.6, n=8) or `greedy` (temp=0, n=1) |
+| `--n` | `8` | Override number of samples per question |
+| `--temperature` | `0.6` | Override sampling temperature |
+| `--skip-existing` | (off) | Skip checkpoints with existing `result.log` |
+| `--pattern` | `checkpoint-*` | Glob pattern for checkpoint directory discovery |
+| `--sort-by` | `step` | Sort discovered checkpoints by: `step`, `time`, `name` |
+| `--limit` | (none) | Limit to first N checkpoints after sorting |
+| `--latest` | (none) | Evaluate only the latest N checkpoints |
+| `--enable-thinking` | (off) | Enable Qwen3 thinking mode |
+| `--max-model-len` | `4096` | Max context window |
+| `--max-new-tokens` | `3072` | Max generation tokens |
+| `--output-base` | `exp/local_eval/{ckpt}` | Override output base directory |
+
+### mcqa_eval.sh (single model)
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -87,7 +136,7 @@ bash scripts/eval/mcqa_eval.sh \
 | `--top-p` | `0.95` | Top-p sampling |
 | `--max-model-len` | `4096` | Max context window |
 | `--max-new-tokens` | `3072` | Max generation tokens |
-| `--enable-thinking` | (off) | Enable Qwen3 thinking mode (`enable_thinking=True` in chat template) |
+| `--enable-thinking` | (off) | Enable Qwen3 thinking mode |
 | `--output-base` | `exp/local_eval/{model}` | Output directory base |
 
 ### mcqa_eval.py (direct usage)
@@ -105,8 +154,6 @@ python mcqa_eval.py \
     --bf16
 ```
 
-Key parameters:
-
 | Parameter | Description |
 |-----------|-------------|
 | `--base_model` | Model path or HuggingFace ID |
@@ -117,6 +164,14 @@ Key parameters:
 | `--enable_thinking` | `True`/`False` — controls Qwen3 thinking mode in chat template |
 | `--n` | Number of samples per question for pass@k/mean@k |
 | `--bf16` | Use bfloat16 precision |
+
+## Sampling & Metrics
+
+Default sampling config: `temperature=0.6`, `top_p=0.95`, `n=8`.
+
+With `n=8` samples per question, the following metrics are computed:
+- **mean@k** for k = 1, 2, 4, 8 — average correctness of first k samples
+- **pass@k** for k = 1, 2, 4 — probability that at least one of k samples is correct (requires `2k <= n`)
 
 ## Thinking Mode
 
