@@ -224,11 +224,11 @@ run_one() {
     IFS='|' read -r data_path answer_key category_keys <<< "${MCQA_DATASETS[$ds_name]}"
     local ckpt_name=$(basename "$checkpoint")
 
-    # Determine output dir
+    # Determine output dir — always include checkpoint name to avoid collisions
     local thinking_suffix=""
     [[ -n "$ENABLE_THINKING" ]] && thinking_suffix="_thinking"
-    local base="${OUTPUT_BASE:-exp/local_eval/${ckpt_name}}"
-    local out_dir="${base}/${ds_name}/temp_${temperature}_top_p_${top_p}_n_${n_samples}${thinking_suffix}"
+    local base="${OUTPUT_BASE:-exp/local_eval}"
+    local out_dir="${base}/${ckpt_name}/${ds_name}/temp_${temperature}_top_p_${top_p}_n_${n_samples}${thinking_suffix}"
 
     # Skip if exists
     if [[ "$SKIP_EXISTING" == true ]] && [[ -f "${out_dir}/result.log" ]]; then
@@ -323,8 +323,8 @@ for checkpoint in "${CHECKPOINT_LIST[@]}"; do
     for ds_name in "${DATASETS_TO_EVAL[@]}"; do
         thinking_suffix=""
         [[ -n "$ENABLE_THINKING" ]] && thinking_suffix="_thinking"
-        base="${OUTPUT_BASE:-exp/local_eval/${ckpt_name}}"
-        result_file="${base}/${ds_name}/temp_${temperature}_top_p_${top_p}_n_${n_samples}${thinking_suffix}/result.log"
+        base="${OUTPUT_BASE:-exp/local_eval}"
+        result_file="${base}/${ckpt_name}/${ds_name}/temp_${temperature}_top_p_${top_p}_n_${n_samples}${thinking_suffix}/result.log"
         if [[ -f "$result_file" ]]; then
             echo "[$ds_name]"
             grep "Overall:" "$result_file" | head -2
