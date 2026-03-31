@@ -240,13 +240,11 @@ run_one() {
     local gpu
     gpu=$(acquire_gpu) || { echo "Failed to acquire GPU for $ckpt_name/$ds_name"; return 1; }
 
-    echo "=========================================="
-    echo "Checkpoint: $ckpt_name"
-    echo "Dataset:    $ds_name"
-    echo "Config:     temp=$temperature top_p=$top_p n=$n_samples"
-    echo "GPU:        $gpu"
-    echo "Output:     $out_dir"
-    echo "=========================================="
+    # Redirect per-job output to log file to avoid interleaved stdout
+    mkdir -p "$out_dir"
+    local log_file="${out_dir}/eval.log"
+
+    echo "[$(date '+%H:%M:%S')] Starting: $ckpt_name / $ds_name [GPU $gpu]"
 
     local rc=0
     CUDA_VISIBLE_DEVICES=$gpu python3 mcqa_eval.py \
@@ -262,14 +260,14 @@ run_one() {
         --max_model_len "$DEFAULT_MAX_MODEL_LEN" \
         --max_new_tokens "$DEFAULT_MAX_NEW_TOKENS" \
         --bf16 \
-        $ENABLE_THINKING || rc=$?
+        $ENABLE_THINKING > "$log_file" 2>&1 || rc=$?
 
     release_gpu "$gpu"
 
     if [[ $rc -eq 0 ]]; then
-        echo "✓ Done: $ckpt_name / $ds_name [GPU $gpu]"
+        echo "[$(date '+%H:%M:%S')] ✓ Done: $ckpt_name / $ds_name [GPU $gpu]"
     else
-        echo "✗ Failed: $ckpt_name / $ds_name [GPU $gpu] (exit $rc)"
+        echo "[$(date '+%H:%M:%S')] ✗ Failed: $ckpt_name / $ds_name [GPU $gpu] (exit $rc). See $log_file"
     fi
     return $rc
 }
