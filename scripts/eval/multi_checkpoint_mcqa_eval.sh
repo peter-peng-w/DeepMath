@@ -54,7 +54,7 @@ MCQA_DATASETS["gpqa_diamond"]="data/gpqa_diamond/test.json|solution|domain"
 
 # Evaluation configs: "temperature top_p n"
 declare -A CONFIGS
-CONFIGS["sampling"]="0.6 0.95 8"
+CONFIGS["sampling"]="0.6 0.95 4"
 CONFIGS["greedy"]="0.0 1.0 1"
 
 # =============================================================================

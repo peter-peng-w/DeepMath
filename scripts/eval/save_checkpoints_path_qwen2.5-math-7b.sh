@@ -4,19 +4,32 @@
 # 
 # CHECKPOINT_DIR="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/group_grpo/lvl3to5_8k_20epochs_128effectbs_repeat_sampler_semantic_group_cosine_weighted"
 #### Pure GRPO (Original GRPO Loss), with different number of rollouts per question
+# CHECKPOINT_DIR="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-7b/math500/grpo/lvl3to5_8k_8epochs_128effectbs_no_std_repeat_sampler_group_mean_4rollouts"
 # CHECKPOINT_DIR="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-7b/math500/grpo/lvl3to5_8k_20epochs_128effectbs_no_std_repeat_sampler_group_mean_8rollouts"
+
+### REINFORCE++
+# CHECKPOINT_DIR="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-7b/math500/group_grpo/lvl3to5_8k_8epochs_128effectbs_repeat_sampler_batch_mean_8rollouts_8prompts_no_std"
 
 #### Group GRPO
 ### Repeat Sampler
 
 ### James-Stein Estimator
 # Batch-level JSPO
+# CHECKPOINT_DIR="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-7b/math500/group_grpo/lvl3to5_8k_8epochs_128effectbs_repeat_sampler_batch_james_stein_4rollouts_8prompts_no_std"
 # CHECKPOINT_DIR="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-7b/math500/group_grpo/lvl3to5_8k_8epochs_128effectbs_repeat_sampler_batch_james_stein_8rollouts_8prompts_no_std"
 
 ### Proportional Cluster Sampling GRPO
-# CHECKPOINT_DIR="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-1.5b/math500/group_grpo/lvl3to5_8k_20epochs_128effectbs_proportional_cluster_sampler_semantic_group_cosine_weighted_8rollouts_8prompts"
-CHECKPOINT_DIR="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-7b/math500/group_grpo/lvl3to5_8k_8epochs_128effectbs_skill_proportional_cluster_sampler_compositional_james_stein_8rollouts_8prompts_no_std"
+# CHECKPOINT_DIR="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-7b/math500/group_grpo/lvl3to5_8k_8epochs_128effectbs_emb_proportional_cluster_sampler_compositional_james_stein_4rollouts_8prompts_no_std"
+# CHECKPOINT_DIR="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-7b/math500/group_grpo/lvl3to5_8k_8epochs_128effectbs_emb_proportional_cluster_sampler_compositional_james_stein_8rollouts_8prompts_no_std"
+# CHECKPOINT_DIR="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-7b/math500/group_grpo/lvl3to5_8k_8epochs_128effectbs_skill_proportional_cluster_sampler_compositional_james_stein_4rollouts_8prompts_no_std"
+# CHECKPOINT_DIR="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-7b/math500/group_grpo/lvl3to5_8k_8epochs_128effectbs_skill_proportional_cluster_sampler_compositional_james_stein_8rollouts_8prompts_no_std"
+# CHECKPOINT_DIR="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-7b/math500/group_grpo/lvl3to5_8k_8epochs_128effectbs_skill_proportional_cluster_sampler_compositional_james_stein_8rollouts_8prompts_no_std_off_policy_value"
+# CHECKPOINT_DIR="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-7b/math500/group_grpo/lvl3to5_8k_8epochs_128effectbs_skill_proportional_cluster_sampler_compositional_james_stein_8rollouts_8prompts_no_std_mix_policy_value_no_drift"
+# CHECKPOINT_DIR="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-7b/math500/group_grpo/lvl3to5_8k_8epochs_128effectbs_math_subject_proportional_cluster_sampler_compositional_james_stein_8rollouts_8prompts_no_std_onpolicy_target_onpolicy_lambda_no_drift"
 
+#### Ablation: Grouping Strategy
+# CHECKPOINT_DIR="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-7b/math500/group_grpo/lvl3to5_8k_8epochs_128effectbs_skill_accuracy_binning_max_entropy_8rollouts_8prompts_no_std_mix_target_onpolicy_lambda_no_drift"
+CHECKPOINT_DIR="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen2.5-math-7b/math500/group_grpo/lvl3to5_8k_8epochs_128effectbs_skill_accuracy_binning_uniform_8rollouts_8prompts_no_std_mix_target_onpolicy_lambda_no_drift"
 
 ################################################
 ####     Cache the checkpoint list file     ####
@@ -24,12 +37,27 @@ CHECKPOINT_DIR="/scratch/pw7nc/LLM_reasoning/off-policy-rl/replay-think/exp/qwen
 
 ## Vanilla GRPO
 # OUTPUT_FILE="./scripts/eval/cache/ckpt_lists/qwen2.5-math-7b/math500/grpo/lvl3to5_8k_20epochs_128effectbs_no_std_repeat_sampler_group_mean_8rollouts/checkpoints_to_eval.txt"
+# OUTPUT_FILE="./scripts/eval/cache/ckpt_lists/qwen2.5-math-7b/math500/grpo/lvl3to5_8k_8epochs_128effectbs_no_std_repeat_sampler_group_mean_4rollouts/checkpoints_to_eval.txt"
+
+## REINFORCE++
+# OUTPUT_FILE="./scripts/eval/cache/ckpt_lists/qwen2.5-math-7b/math500/group_grpo/lvl3to5_8k_8epochs_128effectbs_repeat_sampler_batch_mean_8rollouts_8prompts_no_std/checkpoints_to_eval.txt"
 
 ## James-Stein Estimator
+# OUTPUT_FILE='./scripts/eval/cache/ckpt_lists/qwen2.5-math-7b/math500/group_grpo/lvl3to5_8k_8epochs_128effectbs_repeat_sampler_batch_james_stein_4rollouts_8prompts_no_std/checkpoints_to_eval.txt'
 # OUTPUT_FILE='./scripts/eval/cache/ckpt_lists/qwen2.5-math-7b/math500/group_grpo/lvl3to5_8k_8epochs_128effectbs_repeat_sampler_batch_james_stein_8rollouts_8prompts_no_std/checkpoints_to_eval.txt'
 
 ## Proportional Cluster Sampling GRPO
-OUTPUT_FILE="./scripts/eval/cache/ckpt_lists/qwen2.5-math-7b/math500/group_grpo/lvl3to5_8k_8epochs_128effectbs_skill_proportional_cluster_sampler_compositional_james_stein_8rollouts_8prompts_no_std/checkpoints_to_eval.txt"
+# OUTPUT_FILE="./scripts/eval/cache/ckpt_lists/qwen2.5-math-7b/math500/group_grpo/lvl3to5_8k_8epochs_128effectbs_emb_proportional_cluster_sampler_compositional_james_stein_4rollouts_8prompts_no_std/checkpoints_to_eval.txt"
+# OUTPUT_FILE="./scripts/eval/cache/ckpt_lists/qwen2.5-math-7b/math500/group_grpo/lvl3to5_8k_8epochs_128effectbs_emb_proportional_cluster_sampler_compositional_james_stein_8rollouts_8prompts_no_std/checkpoints_to_eval.txt"
+
+# OUTPUT_FILE="./scripts/eval/cache/ckpt_lists/qwen2.5-math-7b/math500/group_grpo/lvl3to5_8k_8epochs_128effectbs_skill_proportional_cluster_sampler_compositional_james_stein_4rollouts_8prompts_no_std/checkpoints_to_eval.txt"
+# OUTPUT_FILE="./scripts/eval/cache/ckpt_lists/qwen2.5-math-7b/math500/group_grpo/lvl3to5_8k_8epochs_128effectbs_skill_proportional_cluster_sampler_compositional_james_stein_8rollouts_8prompts_no_std/checkpoints_to_eval.txt"
+# OUTPUT_FILE="./scripts/eval/cache/ckpt_lists/qwen2.5-math-7b/math500/group_grpo/lvl3to5_8k_8epochs_128effectbs_skill_proportional_cluster_sampler_compositional_james_stein_8rollouts_8prompts_no_std_off_policy_value/checkpoints_to_eval.txt"
+# OUTPUT_FILE="./scripts/eval/cache/ckpt_lists/qwen2.5-math-7b/math500/group_grpo/lvl3to5_8k_8epochs_128effectbs_skill_proportional_cluster_sampler_compositional_james_stein_8rollouts_8prompts_no_std_mix_policy_value_no_drift/checkpoints_to_eval.txt"
+# OUTPUT_FILE="./scripts/eval/cache/ckpt_lists/qwen2.5-math-7b/math500/group_grpo/lvl3to5_8k_8epochs_128effectbs_math_subject_proportional_cluster_sampler_compositional_james_stein_8rollouts_8prompts_no_std_onpolicy_target_onpolicy_lambda_no_drift/checkpoints_to_eval.txt"
+
+# OUTPUT_FILE="./scripts/eval/cache/ckpt_lists/qwen2.5-math-7b/math500/group_grpo/lvl3to5_8k_8epochs_128effectbs_skill_accuracy_binning_max_entropy_8rollouts_8prompts_no_std_mix_target_onpolicy_lambda_no_drift/checkpoints_to_eval.txt"
+OUTPUT_FILE="./scripts/eval/cache/ckpt_lists/qwen2.5-math-7b/math500/group_grpo/lvl3to5_8k_8epochs_128effectbs_skill_accuracy_binning_uniform_8rollouts_8prompts_no_std_mix_target_onpolicy_lambda_no_drift/checkpoints_to_eval.txt"
 
 # Create the output directory if it doesn't exist
 OUTPUT_DIR=$(dirname "$OUTPUT_FILE")
